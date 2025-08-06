@@ -652,11 +652,12 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ onLocationSelect, onClo
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 md:p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-2xl overflow-hidden max-w-5xl w-full max-h-[95vh] flex flex-col shadow-2xl"
+        className="bg-white rounded-2xl overflow-hidden w-full max-w-5xl max-h-[100vh] flex flex-col shadow-2xl"
+        style={{ height: '100%', maxHeight: '100vh', overflowY: 'auto' }}
       >
         {/* Header */}
         <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
@@ -751,7 +752,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ onLocationSelect, onClo
             </div>
           )}
           
-          <div className="w-full h-[500px]">
+          <div className="w-full h-[60vh] md:h-[500px]">
             {isMapReady && (
               <MapContainer
                 key={mapKey}

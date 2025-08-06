@@ -621,10 +621,10 @@ const AdminDashboardContent = () => {
                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center">
                           <span className="text-orange-600 font-bold text-lg">🥙</span>
                         </div>
-                        <span className="text-gray-900">{item.quantity}x {item.name}</span>
+                        <span className="text-gray-900">{item.quantity}x {('name' in item ? item.name : '')}</span>
                       </div>
                       <span className="font-medium text-gray-900">
-                        {(item.price * item.quantity).toFixed(0)} LE
+                        {('price' in item ? (item.price * item.quantity).toFixed(0) : '')} LE
                       </span>
                     </div>
                   ))}
