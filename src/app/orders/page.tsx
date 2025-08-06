@@ -133,94 +133,87 @@ const OrdersPageContent = () => {
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Validate form data
-    if (!orderData.customerName.trim() || !orderData.customerPhone.trim() || !orderData.location) {
-      await showWarningAlert('بيانات ناقصة', 'يرجى ملء جميع الحقول المطلوبة وتحديد موقع التوصيل');
-      setIsSubmitting(false);
-      return;
+
+    // Enhanced form validation
+    if (!orderData.customerName.trim() || !orderData.customerPhone.trim() || !orderData.location?.address) {
+        await showWarningAlert('بيانات ناقصة', 'يرجى ملء جميع الحقول المطلوبة وتحديد موقع التوصيل بدقة.');
+        setIsSubmitting(false);
+        return;
     }
-    
+
+    if (!orderData.location || typeof orderData.location.lat !== 'number' || typeof orderData.location.lng !== 'number') {
+        await showWarningAlert('موقع غير صالح', 'يرجى تحديد موقع توصيل صحيح من الخريطة.');
+        setIsSubmitting(false);
+        return;
+    }
+
     // Validate order items
-    if (!isDirectOrder && state.items.length === 0) {
-      await showWarningAlert('السلة فارغة', 'يرجى إضافة منتجات إلى السلة أولاً');
-      setIsSubmitting(false);
-      return;
-    }
-    
-    if (isDirectOrder && !directOrderProduct) {
-      await showWarningAlert('لا يوجد منتج للطلب', 'حدث خطأ في تحديد المنتج');
-      setIsSubmitting(false);
-      return;
-    }
-    
-    if (isDirectOrder) {
-      console.log('Direct order product:', directOrderProduct);
-      console.log('Order items:', orderItems);
-    } else {
-      console.log('Cart state:', state);
-      console.log('Cart items:', state.items);
-      
-      // Log each item for debugging
-      state.items.forEach((item, index) => {
-        console.log(`Item ${index}:`, item);
-        console.log(`Item ${index} product:`, item.product);
-        if (item.product) {
-          console.log(`Item ${index} product.id:`, item.product.id);
-        }
-      });
+    if ((!isDirectOrder && state.items.length === 0) || (isDirectOrder && !directOrderProduct)) {
+        await showWarningAlert('لا توجد منتجات', 'يرجى إضافة منتجات لطلبك أولاً.');
+        setIsSubmitting(false);
+        return;
     }
 
     try {
-      // Create order object for MongoDB - send order items (cart or direct)
-      const newOrder = {
-        customerName: orderData.customerName.trim(),
-        customerPhone: `+20${orderData.customerPhone.trim()}`,
-        customerAddress: orderData.location?.address || orderData.customerAddress.trim(),
-        location: orderData.location ? {
-          lat: orderData.location.lat,
-          lng: orderData.location.lng,
-          address: orderData.location.address
-        } : null,
-        items: orderItems,  // Send order items (cart items or direct order)
-        total: total,
-        paymentMethod: 'cash',
-        status: 'pending',
-        createdAt: new Date()
-      };
+        // Prepare detailed order data
+        const newOrder = {
+            customerName: orderData.customerName.trim(),
+            customerPhone: `+20${orderData.customerPhone.trim()}`,
+            customerAddress: orderData.location.address, // Always use the precise address from location picker
+            location: {
+                lat: orderData.location.lat,
+                lng: orderData.location.lng,
+                address: orderData.location.address,
+            },
+            items: orderItems.map(item => ({
+                productId: item.product.id || item.product._id,
+                name: item.product.name,
+                quantity: item.quantity,
+                price: item.product.price
+            })),
+            totalAmount: total, // Corrected field name to match schema
+            paymentMethod: 'cash',
+            status: 'pending',
+        };
 
-      console.log('Submitting order:', newOrder);
-      
-      // Save order to MongoDB
-      const orderId = await addOrder(newOrder);
-      
-      console.log('Order saved with ID:', orderId);
-      
-      // حفظ المنتجات في سجل الطلبات السابقة
-      saveOrderHistory(orderItems);
-      
-      // Success message
-      await showOrderSuccessAlert({
-        customerName: orderData.customerName,
-        orderId: orderId,
-        total: total,
-        customerAddress: orderData.customerAddress,
-        customerPhone: orderData.customerPhone
-      });
-      
-      // Clear cart only if it's not a direct order
-      if (!isDirectOrder) {
-        dispatch({ type: 'CLEAR_CART' });
-      }
-      router.push('/');
-      
+        console.log('Submitting new order:', newOrder);
+
+        // Use the transactional function to save the order
+        const result = await addOrder(newOrder);
+
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to create order.');
+        }
+
+        const orderId = result.data._id;
+        console.log('Order saved successfully with ID:', orderId);
+
+        // Save to order history
+        saveOrderHistory(orderItems);
+
+        // Show success alert
+        await showOrderSuccessAlert({
+            customerName: newOrder.customerName,
+            orderId: orderId,
+            total: newOrder.totalAmount,
+            customerAddress: newOrder.customerAddress,
+            customerPhone: orderData.customerPhone, // Show phone without country code
+        });
+
+        // Clear cart if not a direct order
+        if (!isDirectOrder) {
+            dispatch({ type: 'CLEAR_CART' });
+        }
+
+        router.push('/');
+
     } catch (error) {
-      console.error('Error submitting order:', error);
-      await showErrorAlert('خطأ في تأكيد الطلب', 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.');
+        console.error('Error submitting order:', error);
+        await showErrorAlert('خطأ في تأكيد الطلب', `حدث خطأ: ${error.message}. يرجى المحاولة مرة أخرى.`);
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
-  };
+};
 
   return (
     <div className="pt-16 min-h-screen bg-gray-50">

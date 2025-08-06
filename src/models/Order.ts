@@ -83,6 +83,10 @@ const OrderSchema = new mongoose.Schema({
   },
 });
 
+OrderSchema.index({ customerPhone: 1 });
+OrderSchema.index({ status: 1 });
+OrderSchema.index({ createdAt: -1 });
+
 // Add validation for items array
 OrderSchema.path('items').validate(function(items) {
   return items && items.length > 0;

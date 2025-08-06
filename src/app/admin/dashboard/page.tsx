@@ -579,7 +579,12 @@ const AdminDashboardContent = () => {
                     Order #{order.id.slice(-6).toUpperCase()}
                   </h3>
                   <p className="text-gray-600">{order.customerName} • {order.customerPhone}</p>
-                  <p className="text-gray-600 text-sm">{order.customerAddress}</p>
+                  <p className="text-gray-600 text-sm">
+                    {order.customerAddress}
+                    {order.customerAddress && order.customerAddress.includes('(بالقرب من:') && (
+                      <span className="text-blue-700 font-bold ml-2">{order.customerAddress.match(/\(بالقرب من:[^)]+\)/)?.[0]}</span>
+                    )}
+                  </p>
                   <p className="text-gray-500 text-xs mt-1">
                     {order.createdAt.toLocaleString('ar-EG')}
                   </p>

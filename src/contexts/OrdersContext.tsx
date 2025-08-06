@@ -6,7 +6,7 @@ import { Order } from '@/types';
 interface OrdersContextType {
   orders: Order[];
   loading: boolean;
-  addOrder: (orderData: Omit<Order, 'id'>) => Promise<string>;
+  addOrder: (orderData: Omit<Order, 'id'>) => Promise<{ success: boolean; data?: any; error?: string; }>;
   updateOrderStatus: (id: string, status: string) => Promise<void>;
   refreshOrders: () => Promise<void>;
 }
@@ -62,136 +62,56 @@ export const OrdersProvider: React.FC<OrdersProviderProps> = ({ children }) => {
     loadOrders();
   }, []);
 
-  const addOrder = async (orderData: Omit<Order, 'id'>): Promise<string> => {
+  const addOrder = async (orderData: Omit<Order, 'id'>): Promise<{ success: boolean; data?: any; error?: string; }> => {
     try {
-      console.log('OrdersContext: Starting to add order...', orderData);
-      console.log('OrdersContext: orderData.items:', orderData.items);
-      
-      // Validate items data
-      if (!orderData.items || !Array.isArray(orderData.items) || orderData.items.length === 0) {
-        console.error('OrdersContext: Invalid items array:', orderData.items);
-        throw new Error('Order must have at least one item');
-      }
-      
-      // Check if items have the correct format
-      const hasProductObjects = orderData.items.some(item => item.product && typeof item.product === 'object');
-      const hasDirectFields = orderData.items.some(item => item.productId && item.name && item.price);
-      
-      let mongoOrderData;
-      
-      if (hasDirectFields) {
-        // Items already have productId, name, price directly (from orders page)
-        console.log('OrdersContext: Items have direct fields format');
-        
-        mongoOrderData = {
-          customerName: orderData.customerName,
-          customerPhone: orderData.customerPhone,
-          customerAddress: orderData.customerAddress,
-          items: orderData.items.map((item: any, index) => {
-            console.log(`OrdersContext: Processing direct item ${index}:`, item);
-            
-            if (!item.productId || !item.name || !item.price || !item.quantity) {
-              console.error(`OrdersContext: Item ${index} missing required fields:`, item);
-              throw new Error(`Item ${index} is missing required fields`);
-            }
-            
-            return {
-              productId: item.productId,
-              name: item.name,
-              quantity: item.quantity,
-              price: item.price
-            };
-          }),
-          totalAmount: orderData.totalAmount || orderData.total,
-          paymentMethod: orderData.paymentMethod || 'cash',
-          status: orderData.status || 'pending'
-        };
-      } else if (hasProductObjects) {
-        // Items have product objects (from cart context)
-        console.log('OrdersContext: Items have product objects format');
-        
-        // Log each item for detailed debugging
-        orderData.items.forEach((item, index) => {
-          console.log(`OrdersContext: Item ${index}:`, item);
-          console.log(`OrdersContext: Item ${index} product:`, item?.product);
-        });
-        
-        mongoOrderData = {
-          customerName: orderData.customerName,
-          customerPhone: orderData.customerPhone,
-          customerAddress: orderData.customerAddress,
-          items: orderData.items.map((item, index) => {
-            console.log(`OrdersContext: Processing product object item ${index}:`, item);
-            
-            // Check if item exists
-            if (!item) {
-              console.error(`OrdersContext: Item ${index} is null/undefined:`, item);
-              throw new Error(`Item ${index} is missing`);
-            }
-            
-            // Check if product exists
-            if (!item.product) {
-              console.error(`OrdersContext: Item ${index} product is null/undefined:`, item);
-              throw new Error(`Item ${index} is missing product information`);
-            }
-            
-            // Check if product.id exists
-            if (!item.product.id) {
-              console.error(`OrdersContext: Item ${index} product.id is missing:`, item.product);
-              throw new Error(`Item ${index} product is missing ID`);
-            }
-            
-            console.log(`OrdersContext: Successfully processing item ${index}`);
-            
-            return {
-              productId: item.product.id,
-              name: item.product.name,
-              quantity: item.quantity,
-              price: item.product.price
-            };
-          }),
-          totalAmount: orderData.totalAmount || orderData.total,
-          paymentMethod: orderData.paymentMethod || 'cash',
-          status: orderData.status || 'pending'
-        };
-      } else {
-        console.error('OrdersContext: Invalid item format:', orderData.items);
-        throw new Error('Invalid item format');
-      }
-      
-      console.log('OrdersContext: Sending order data to API:', mongoOrderData);
-      
+      const transformedOrderData = {
+        ...orderData,
+        items: orderData.items.map(item => {
+          const productId = item.productId || item.product?.id || item.product?._id;
+          if (!productId) {
+            throw new Error('A product ID is missing from an item in the order.');
+          }
+          return {
+            productId: productId,
+            name: item.name || item.product?.name,
+            quantity: item.quantity,
+            price: item.price || item.product?.price,
+          };
+        }),
+        totalAmount: orderData.totalAmount || orderData.total,
+      };
+
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(mongoOrderData),
+        body: JSON.stringify(transformedOrderData),
       });
-      
+
+      const responseData = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('OrdersContext: API Error:', errorData);
-        throw new Error(errorData.error || 'Failed to add order');
+        console.error('OrdersContext: API Error:', responseData);
+        return { success: false, error: responseData.details || responseData.error || 'Failed to add order' };
       }
       
-      const savedOrder = await response.json();
-      console.log('OrdersContext: Order added to MongoDB with ID:', savedOrder._id);
+      console.log('OrdersContext: Order added to MongoDB with ID:', responseData._id);
       
-      // Add to local state immediately
       const newOrder: Order = {
-        ...savedOrder,
-        id: savedOrder._id,
-        total: savedOrder.totalAmount  // Map back to frontend format
+        ...responseData,
+        id: responseData._id,
+        createdAt: new Date(responseData.createdAt),
+        total: responseData.totalAmount
       };
       setOrders(prev => [newOrder, ...prev]);
       
       console.log('OrdersContext: Order added to local state');
       
-      return savedOrder._id;
+      return { success: true, data: responseData };
     } catch (error) {
       console.error('OrdersContext: Error adding order:', error);
-      throw error;
+      return { success: false, error: error.message };
     }
   };
 

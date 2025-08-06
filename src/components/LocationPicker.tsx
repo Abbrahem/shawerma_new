@@ -59,16 +59,13 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ onLocationSelect, onClo
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ar,en&zoom=18&addressdetails=1`
       );
-      
       if (!response.ok) {
         throw new Error('Failed to fetch address');
       }
-      
       const data = await response.json();
-      
       let address = data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-      
-      // Try to format Arabic address better with more details
+      // إضافة أقرب معلم شهير إذا وجد
+      let landmark = '';
       if (data.address) {
         const parts = [];
         if (data.address.house_number) parts.push(`رقم ${data.address.house_number}`);
@@ -80,12 +77,22 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ onLocationSelect, onClo
         if (data.address.city || data.address.town) parts.push(data.address.city || data.address.town);
         if (data.address.governorate || data.address.state) parts.push(data.address.governorate || data.address.state);
         if (data.address.country) parts.push(data.address.country);
-        
+        // البحث عن معلم شهير
+        if (data.address.landmark) landmark = data.address.landmark;
+        else if (data.address.attraction) landmark = data.address.attraction;
+        else if (data.address.building) landmark = data.address.building;
+        else if (data.address.mall) landmark = data.address.mall;
+        else if (data.address.theatre) landmark = data.address.theatre;
+        else if (data.address.hospital) landmark = data.address.hospital;
+        else if (data.address.university) landmark = data.address.university;
+        else if (data.address.school) landmark = data.address.school;
         if (parts.length > 0) {
           address = parts.join(', ');
         }
+        if (landmark) {
+          address += ` (بالقرب من: ${landmark})`;
+        }
       }
-      
       setSelectedLocation({ lat, lng, address });
     } catch (error) {
       console.error('Address lookup failed:', error);

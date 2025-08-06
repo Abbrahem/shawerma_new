@@ -65,11 +65,12 @@ const Navbar = () => {
             className={`flex items-center ${isRTL ? 'space-x-reverse space-x-4' : 'space-x-4'}`}
           >
             {/* Language Toggle Button */}
+            {/* زر تغيير اللغة يظهر فقط في الديسكتوب */}
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               onClick={toggleLanguage}
-              className="p-2 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors"
+              className="p-2 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors hidden md:flex"
               title={language === 'en' ? 'Switch to Arabic' : 'Switch to English'}
             >
               <div className="flex items-center space-x-1">
