@@ -1,19 +1,26 @@
 // مثال على Transaction و Rollback
-import clientPromise from './mongodb';
+import mongoose from 'mongoose';
+import Order from '@/models/Order';
+import connectDB from './mongodb';
 
 async function createOrderWithTransaction(orderData) {
-  const client = await clientPromise;
-  const session = client.startSession();
-  let result;
+  await connectDB();
+  
+  const session = await mongoose.startSession();
+  let result = { success: false, data: null, error: null };
+  
   try {
     await session.withTransaction(async () => {
-      const db = client.db();
-      result = await db.collection('orders').insertOne(orderData, { session });
+      const order = new Order(orderData);
+      const savedOrder = await order.save({ session });
+      result.data = savedOrder;
+      result.success = true;
       // يمكنك إضافة عمليات أخرى هنا داخل نفس الترانزاكشن
     });
     console.log('Order created successfully with transaction');
   } catch (error) {
     console.error('Transaction failed, rolling back:', error);
+    result.error = error.message;
     // سيتم عمل Rollback تلقائي من MongoDB
   } finally {
     await session.endSession();
